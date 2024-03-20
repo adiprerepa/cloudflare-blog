@@ -22,6 +22,36 @@ extern size_t bpf_insn_prog_verdict_cnt;
 extern struct bpf_insn bpf_insn_prog_verdict[];
 extern struct tbpf_reloc bpf_reloc_prog_verdict[];
 
+int net_connect_tcp(const char *ip, int port) {
+    int sockfd;
+    struct sockaddr_in servaddr;
+
+    // Create socket
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) {
+        perror("socket creation failed");
+        return -1;
+    }
+
+    // Set server address
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_port = htons(port);
+    if (inet_pton(AF_INET, ip, &servaddr.sin_addr) <= 0) {
+        perror("inet_pton failed");
+        close(sockfd);
+        return -1;
+    }
+
+    // Connect to server
+    if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
+        perror("connect failed");
+        close(sockfd);
+        return -1;
+    }
+
+    return sockfd;
+}
+
 int main(int argc, char **argv)
 {
 	/* [*] SOCKMAP requires more than 16MiB of locked mem */
@@ -67,6 +97,7 @@ int main(int argc, char **argv)
 	 * to both parser and verdict programs, even though in parser
 	 * we don't use it. The whole point is to make prog_parser
 	 * hooked to SOCKMAP.*/
+
 	int r = tbpf_prog_attach(bpf_parser, sock_map, BPF_SK_SKB_STREAM_PARSER,
 				 0);
 	if (r < 0) {
@@ -97,6 +128,21 @@ int main(int argc, char **argv)
 	int sd = net_bind_tcp(&listen);
 	if (sd < 0) {
 		PFATAL("connect()");
+	}
+
+	// connect to localhost:5004, and add the socket to the sockmap
+	int connect_fd = net_connect_tcp("127.0.0.1", 5004);
+	if (connect_fd < 0) {
+		PFATAL("connect()");
+	}
+	int sizeval = 32 * 1024 * 1024;
+	setsockopt(connect_fd, SOL_SOCKET, SO_SNDBUF, &sizeval, sizeof(sizeval));
+
+	int sidx = 1; // Assuming index 1 is for the outgoing connection
+	int sval = connect_fd;
+	r = tbpf_map_update_elem(sock_map, &sidx, &sval, BPF_ANY);
+	if (r != 0) {
+		PFATAL("bpf(MAP_UPDATE_ELEM) for connect_fd");
 	}
 
 again_accept:;
