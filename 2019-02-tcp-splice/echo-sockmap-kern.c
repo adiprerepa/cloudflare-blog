@@ -1,7 +1,10 @@
 #include <stdint.h>
 
-#include "bpf.h"
-#include "bpf_helpers.h"
+// #include "bpf.h"
+// #include "bpf_helpers.h"
+#include <linux/bpf.h>
+#include <bpf/bpf_helpers.h>
+#include <bpf/bpf_endian.h>
 
 struct bpf_map_def SEC("maps") sock_map = {
 	.type = BPF_MAP_TYPE_SOCKMAP,
@@ -38,7 +41,9 @@ int _prog_parser(struct __sk_buff *skb)
 SEC("prog_verdict")
 int _prog_verdict(struct __sk_buff *skb)
 {
-	bpf_debug("prog_verdict\n");
-	// bpf_trace_printk("prog_verdict %d\n", skb->len);
-	return bpf_sk_redirect_map(skb, &sock_map, 0, 0);
+
+	uint16_t remote_port_h = bpf_ntohl(skb->remote_port);
+	bpf_printk("Remote Port %d, Local Port %d\n", remote_port_h, skb->local_port);
+	uint32_t idx = 1;
+	return bpf_sk_redirect_map(skb, &sock_map, idx, 0);
 }
