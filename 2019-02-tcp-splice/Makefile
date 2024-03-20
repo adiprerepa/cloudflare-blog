@@ -32,9 +32,9 @@ all: venv/.ok
 		net.c \
 		echo-sockmap-ebpf.c \
 		echo-sockmap.c \
+		-l elf \
 		-o echo-sockmap
 
-#		-l elf \#
 venv/.ok:
 	virtualenv venv --python=python3
 	./venv/bin/pip3 install pyelftools

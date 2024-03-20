@@ -13,7 +13,7 @@ struct bpf_map_def SEC("maps") sock_map = {
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-// #ifndef NDEBUG
+#ifndef NDEBUG
 /* Only use this for debug output. Notice output from bpf_trace_printk()
  * end-up in /sys/kernel/debug/tracing/trace_pipe
  */
@@ -22,12 +22,12 @@ struct bpf_map_def SEC("maps") sock_map = {
 		char ____fmt[] = fmt;                                          \
 		bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__);     \
 	})
-// #else
-// #define bpf_debug(fmt, ...)                                                    \
-// 	{                                                                      \
-// 	}                                                                      \
-// 	while (0)
-// #endif
+#else
+#define bpf_debug(fmt, ...)                                                    \
+	{                                                                      \
+	}                                                                      \
+	while (0)
+#endif
 
 SEC("prog_parser")
 int _prog_parser(struct __sk_buff *skb)
@@ -38,7 +38,6 @@ int _prog_parser(struct __sk_buff *skb)
 SEC("prog_verdict")
 int _prog_verdict(struct __sk_buff *skb)
 {
-	bpf_debug("prog_verdict\n");
-	// bpf_trace_printk("prog_verdict %d\n", skb->len);
-	return bpf_sk_redirect_map(skb, &sock_map, 0, 0);
+	uint32_t idx = 0;
+	return bpf_sk_redirect_map(skb, &sock_map, idx, 0);
 }
