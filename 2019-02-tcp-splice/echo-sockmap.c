@@ -64,7 +64,7 @@ int main(int argc, char **argv)
 
 	/* [*] Prepare ebpf */
 	int sock_map = tbpf_create_map(BPF_MAP_TYPE_SOCKMAP, sizeof(int),
-				       sizeof(int), 2, 0);
+				       sizeof(int), 20, 0);
 	if (sock_map < 0) {
 		PFATAL("bpf(BPF_MAP_CREATE, BPF_MAP_TYPE_SOCKMAP)");
 	}
@@ -131,10 +131,29 @@ int main(int argc, char **argv)
 	}
 
 	
-
+	
+	int connected_to_remote = 0;
+	int idx = 1;
 again_accept:;
 	struct sockaddr_storage client;
 	int fd = net_accept(sd, &client);
+	if (connected_to_remote == 0) { 
+		// connect to localhost:5004, and add the socket to the sockmap
+		int connect_fd = net_connect_tcp("127.0.0.1", 5004);
+		if (connect_fd < 0) {
+			PFATAL("connect()");
+		}
+		int sizeval = 32 * 1024 * 1024;
+		setsockopt(connect_fd, SOL_SOCKET, SO_SNDBUF, &sizeval, sizeof(sizeval));
+
+		int sidx = 0; // Assuming index 1 is for the outgoing connection
+		int sval = connect_fd;
+		r = tbpf_map_update_elem(sock_map, &sidx, &sval, BPF_ANY);
+		if (r != 0) {
+			PFATAL("bpf(MAP_UPDATE_ELEM) for connect_fd");
+		}
+		connected_to_remote = 1;
+	}
 
 	if (busy_poll) {
 		int val = 10 * 1000; // 10 ms, in us. requires CAP_NET_ADMIN
@@ -162,7 +181,6 @@ again_accept:;
 
 	/* [*] Perform ebpf socket magic */
 	/* Add socket to SOCKMAP. Otherwise the ebpf won't work. */
-	int idx = 0;
 	int val = fd;
 	r = tbpf_map_update_elem(sock_map, &idx, &val, BPF_ANY);
 	if (r != 0) {
@@ -173,21 +191,13 @@ again_accept:;
 		}
 		PFATAL("bpf(MAP_UPDATE_ELEM)");
 	}
-
-	// connect to localhost:5004, and add the socket to the sockmap
-	int connect_fd = net_connect_tcp("127.0.0.1", 5004);
-	if (connect_fd < 0) {
-		PFATAL("connect()");
+	printf("added idx=%d\n", idx);
+	idx++;
+	if (idx == 11) {
+		idx = 1;
 	}
-	int sizeval = 32 * 1024 * 1024;
-	setsockopt(connect_fd, SOL_SOCKET, SO_SNDBUF, &sizeval, sizeof(sizeval));
+	goto again_accept;
 
-	int sidx = 1; // Assuming index 1 is for the outgoing connection
-	int sval = connect_fd;
-	r = tbpf_map_update_elem(sock_map, &sidx, &sval, BPF_ANY);
-	if (r != 0) {
-		PFATAL("bpf(MAP_UPDATE_ELEM) for connect_fd");
-	}
 
 	/* [*] Wait for the socket to close. Let sockmap do the magic. */
 	struct pollfd fds[1] = {

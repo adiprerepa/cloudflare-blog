@@ -10,7 +10,7 @@ struct bpf_map_def SEC("maps") sock_map = {
 	.type = BPF_MAP_TYPE_SOCKMAP,
 	.key_size = sizeof(int),
 	.value_size = sizeof(int),
-	.max_entries = 2,
+	.max_entries = 20,
 };
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -46,8 +46,8 @@ int _prog_verdict(struct __sk_buff *skb)
 	bpf_debug("Remote Port %d, Local Port %d\n", remote_port_h, skb->local_port);
 	// bpf_printk("Remote Port %d, Local Port %d\n", remote_port_h, skb->local_port);
 	if (skb->local_port == 50000) {
-		return bpf_sk_redirect_map(skb, &sock_map, 1, 0);
-	} else {
 		return bpf_sk_redirect_map(skb, &sock_map, 0, 0);
+	} else {
+		return bpf_sk_redirect_map(skb, &sock_map, 1, 0);
 	}
 }
