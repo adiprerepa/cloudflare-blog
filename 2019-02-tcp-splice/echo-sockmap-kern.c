@@ -43,7 +43,11 @@ int _prog_verdict(struct __sk_buff *skb)
 {
 
 	uint16_t remote_port_h = bpf_ntohl(skb->remote_port);
-	bpf_printk("Remote Port %d, Local Port %d\n", remote_port_h, skb->local_port);
-	uint32_t idx = 1;
-	return bpf_sk_redirect_map(skb, &sock_map, idx, 0);
+	bpf_debug("Remote Port %d, Local Port %d\n", remote_port_h, skb->local_port);
+	// bpf_printk("Remote Port %d, Local Port %d\n", remote_port_h, skb->local_port);
+	if (skb->local_port == 50000) {
+		return bpf_sk_redirect_map(skb, &sock_map, 1, 0);
+	} else {
+		return bpf_sk_redirect_map(skb, &sock_map, 0, 0);
+	}
 }

@@ -130,20 +130,7 @@ int main(int argc, char **argv)
 		PFATAL("connect()");
 	}
 
-	// connect to localhost:5004, and add the socket to the sockmap
-	int connect_fd = net_connect_tcp("127.0.0.1", 5004);
-	if (connect_fd < 0) {
-		PFATAL("connect()");
-	}
-	int sizeval = 32 * 1024 * 1024;
-	setsockopt(connect_fd, SOL_SOCKET, SO_SNDBUF, &sizeval, sizeof(sizeval));
-
-	int sidx = 1; // Assuming index 1 is for the outgoing connection
-	int sval = connect_fd;
-	r = tbpf_map_update_elem(sock_map, &sidx, &sval, BPF_ANY);
-	if (r != 0) {
-		PFATAL("bpf(MAP_UPDATE_ELEM) for connect_fd");
-	}
+	
 
 again_accept:;
 	struct sockaddr_storage client;
@@ -185,6 +172,21 @@ again_accept:;
 			goto again_accept;
 		}
 		PFATAL("bpf(MAP_UPDATE_ELEM)");
+	}
+
+	// connect to localhost:5004, and add the socket to the sockmap
+	int connect_fd = net_connect_tcp("127.0.0.1", 5004);
+	if (connect_fd < 0) {
+		PFATAL("connect()");
+	}
+	int sizeval = 32 * 1024 * 1024;
+	setsockopt(connect_fd, SOL_SOCKET, SO_SNDBUF, &sizeval, sizeof(sizeval));
+
+	int sidx = 1; // Assuming index 1 is for the outgoing connection
+	int sval = connect_fd;
+	r = tbpf_map_update_elem(sock_map, &sidx, &sval, BPF_ANY);
+	if (r != 0) {
+		PFATAL("bpf(MAP_UPDATE_ELEM) for connect_fd");
 	}
 
 	/* [*] Wait for the socket to close. Let sockmap do the magic. */
